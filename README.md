@@ -82,22 +82,122 @@ para_img= imread(train_path+
                  os.listdir(train_path+'/parasitized')[0])
 plt.imshow(para_img)
 ```
+# Check Image Dimensions:
+```
+# Checking the image dimensions
+dim1 = []
+dim2 = []
+for image_filename in os.listdir(test_path+'/uninfected'):
+    img = imread(test_path+'/uninfected'+'/'+image_filename)
+    d1,d2,colors = img.shape
+    dim1.append(d1)
+    dim2.append(d2)
+
+sns.jointplot(x=dim1,y=dim2)
+image_shape = (130,130,3)
+```
+# Image Generator: 
+```
+image_gen = ImageDataGenerator(rotation_range=20, # rotate the image 20 degrees
+                               width_shift_range=0.10, # Shift the pic width by a max of 5%
+                               height_shift_range=0.10, # Shift the pic height by a max of 5%
+                               rescale=1/255, # Rescale the image by normalzing it.
+                               shear_range=0.1, # Shear means cutting away part of the image (max 10%)
+                               zoom_range=0.1, # Zoom in by 10% max
+                               horizontal_flip=True, # Allo horizontal flipping
+                               fill_mode='nearest' # Fill in missing pixels with the nearest filled value)
+
+image_gen.flow_from_directory(train_path)
+image_gen.flow_from_directory(test_path)
+```
+# Generate the model & compile:
+```
+model = models.Sequential()
+model.add(keras.Input(shape=(image_shape)))
+model.add(layers.Conv2D(filters=32,kernel_size=(3,3),activation='relu',))
+model.add(layers.MaxPooling2D(pool_size=(2, 2)))
+
+model.add(layers.Conv2D(filters=64, kernel_size=(3,3), activation='relu',))
+model.add(layers.MaxPooling2D(pool_size=(2, 2)))
+
+model.add(layers.Conv2D(filters=64, kernel_size=(3,3), activation='relu',))
+model.add(layers.MaxPooling2D(pool_size=(2, 2)))
+
+model.add(layers.Flatten())
+
+model.add(layers.Dense(128))
+model.add(layers.Dense(64,activation='relu'))
+model.add(layers.Dropout(0.5))
+model.add(layers.Dense(1,activation='sigmoid'))
+model.compile(loss='binary_crossentropy',optimizer='adam',metrics=['accuracy'])
+model.summary()
+
+batch_size = 16
+```
+# Fit the model:
+```
+train_image_gen = image_gen.flow_from_directory(train_path,target_size=image_shape[:2],
+                              color_mode='rgb',batch_size=batch_size,class_mode='binary')
+train_image_gen.batch_size
+len(train_image_gen.classes)
+train_image_gen.total_batches_seen
+test_image_gen = image_gen.flow_from_directory(test_path,target_size=image_shape[:2],
+                              color_mode='rgb',batch_size=batch_size,
+                              class_mode='binary',shuffle=False)
+train_image_gen.class_indices
+results = model.fit(train_image_gen,epochs=10,validation_data=test_image_gen)
+model.save('cell_model.h5')
+```
+# Plot graphs:
+```
+losses = pd.DataFrame(model.history.history)
+losses[['loss','val_loss']].plot()
+model.metrics_names
+```
+# Metrics Evaluation
+```
+model.evaluate(test_image_gen)
+pred_probabilities = model.predict(test_image_gen)
+test_image_gen.classes
+predictions = pred_probabilities > 0.5
+print(classification_report(test_image_gen.classes,predictions))
+confusion_matrix(test_image_gen.classes,predictions)
+```
+# Check for new image:
+```
+list_dir=["Un Infected","parasitized"]
+dir_=(rnd.choice(list_dir))
+p_img=imread(train_path+'/'+dir_+'/'+os.listdir(train_path+'/'+dir_)[rnd.randint(0,100)])
+img  = tf.convert_to_tensor(np.asarray(p_img))
+img = tf.image.resize(img,(130,130))
+img=img.numpy()
+pred=bool(model.predict(img.reshape(1,130,130,3))<0.5 )
+plt.title("Model prediction: "+("Parasitized" if pred  else "Un Infected")
+			+"\nActual Value: "+str(dir_))
+plt.axis("off")
+plt.imshow(img)
+plt.show()
+```
 ## OUTPUT
 
 ### Training Loss, Validation Loss Vs Iteration Plot
 
-Include your plot here
+![image](https://github.com/Saibandhavi75/malaria-cell-recognition/assets/94208895/413cec80-e205-4a42-86dd-c15ae0a9829e)
+
 
 ### Classification Report
 
-Include Classification Report here
+![image](https://github.com/Saibandhavi75/malaria-cell-recognition/assets/94208895/d2d5b038-6da0-498e-98ea-b461c8239b9c)
+
 
 ### Confusion Matrix
 
-Include confusion matrix here
+![image](https://github.com/Saibandhavi75/malaria-cell-recognition/assets/94208895/67d0ec11-8f22-4c6d-9ac6-260b2b6da196)
 
 ### New Sample Data Prediction
 
-Include your sample cell image input and output of your model.
+![image](https://github.com/Saibandhavi75/malaria-cell-recognition/assets/94208895/13e26c77-b79c-4a9e-aeac-94f736527800)
+
 
 ## RESULT
+The model's performance is evaluated through training and testing, and it shows potential for assisting healthcare professionals in diagnosing malaria more efficiently and accurately.
